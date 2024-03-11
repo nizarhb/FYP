@@ -174,12 +174,12 @@
                                     </div>
                                     <div class="product__item__text">
                                         <ul>
-                                            <li>{{movie.release_date}}</li>
+                                            <li>{{movie.first_air_date}}</li>
                                             {% for genre in movie.genres %}
                                             <li>{{genre}}</li>
                                             {% endfor %}
                                         </ul>
-                                        <h5><a href="{% url 'movie-details' movie.id %}">{{movie.title}}</a></h5>
+                                        <h5><a href="{% url 'movie-details' movie.id %}">{{ movie.original_name }}</a></h5>
                                     </div>
                                 </div>
                             </div>

@@ -1,11 +1,32 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
 from django.contrib.auth.models import User, auth
 from django.contrib import messages
 from .api import get_top_rated_movies, get_latest_movies, get_popular_shows, get_trending_movies,get_top_viewed_movies,get_related_movies,get_upcoming_movies
 import requests
 import datetime
+from .models import Review
+
 # Create your views here.
+def submit_review(request):
+    if request.method == 'POST':
+        # Retrieve form data
+        movie_id = request.POST.get('movie_id')
+        review_text = request.POST.get('review_text')
+        rating = int(request.POST.get('rating'))
+        # Create a new Review object
+        review = Review.objects.create(
+            movie_id=movie_id,
+            rating=rating,
+            user=request.user,
+            review_text=review_text
+        )
+
+        # Redirect to the movie detail page or any other appropriate page
+        return redirect('movie-details', movie_id=movie_id)
+
+    # Handle GET requests if needed
+    # ...
 
 
 
@@ -93,7 +114,8 @@ def movie_details(request, movie_id):
         
         base_image_url = "https://image.tmdb.org/t/p/w500"
         movie["poster_url"] = base_image_url + movie["poster_path"]
-        return render(request, 'movie-details.html', {'movie': movie,'categories':categories,'related_movies':related_movies[:5]})
+        reviews = Review.objects.filter(movie_id=movie_id)
+        return render(request, 'movie-details.html', {'movie': movie,'categories':categories,'related_movies':related_movies[:5],'reviews': reviews})
     else:
         return render(request, 'error.html', {'message': 'Failed to retrieve movie details.'})
 def signup(request):
@@ -180,3 +202,8 @@ def movie(request):
 def logout(request):
     auth.logout(request)
     return redirect('/')
+
+def delete_review(request, review_id):
+    review = get_object_or_404(Review, id=review_id, user=request.user)
+    review.delete()
+    return redirect('movie-details', movie_id=review.movie_id)

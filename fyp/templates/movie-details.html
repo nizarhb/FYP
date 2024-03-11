@@ -1,4 +1,5 @@
 {% load static %}
+{% load custom_filters %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -60,7 +61,7 @@
                                 </li>
                                 <li><a href="{% url 'blog' %}">Coming Soon</a></li>
                                 {% if user.is_authenticated %}
-                                <li><a href="logout">Logout</a></li>
+                                <li><a href="{% url 'logout' %}">Logout</a></li>
                                 {% else %}
                                 <li><a href="{% url 'signup' %}">Sign Up</a></li>
                                 {% endif %}
@@ -71,7 +72,7 @@
                 <div class="col-lg-2">
                     <div class="header__right">
                         <a href="#" class="search-switch"><span class="icon_search"></span></a>
-                        <a href="login"><span class="icon_profile"></span></a>
+                        <a href="{% url 'login' %}"><span class="icon_profile"></span></a>
                     </div>
                 </div>
             </div>
@@ -166,72 +167,60 @@
                         <div class="section-title">
                             <h5>Reviews</h5>
                         </div>
-                        <div class="anime__review__item">
-                            <div class="anime__review__item__pic">
-                                <img src="img/anime/user.jpg" alt="">
+                        <div id="review-section">
+                            {% for review in reviews %}
+                            <div class="anime__review__item">
+                                <div class="anime__review__item__pic">
+                                    <div class="avatar avatar-initials">{{ review.user.username|get_initials }}</div>
+                                 
+                                </div>
+                                <div class="anime__review__item__text">
+                                    <h6>{{ review.user.username }} - <span>{{ review.created_at }}</span></h6>
+                                    <div class="rating-stars">
+                                        {% if review.rating %}
+                                        {% for i in review.rating|star_range %}
+                                        <span class="star gold-star">&#9733;</span>
+                                        {% endfor %}
+                                        {% for i in 5|subtract:review.rating|star_range %}
+                                        <span class="star">&#9733;</span>
+                                        {% endfor %}
+                                        {% endif %}
+                                    </div>
+                                    <p>{{ review.review_text }}</p>
+
+                                    {% if review.user == request.user %}
+                                    <a href="{% url 'delete_review' review.id %}">Delete</a>
+                                    {% endif %}
+                                </div>
                             </div>
-                            <div class="anime__review__item__text">
-                                <h6>Chris Curry - <span>1 Hour ago</span></h6>
-                                <p>whachikan Just noticed that someone categorized this as belonging to the genre
-                                    "demons" LOL</p>
-                            </div>
-                        </div>
-                        <div class="anime__review__item">
-                            <div class="anime__review__item__pic">
-                                <img src="img/anime/user.jpg" alt="">
-                            </div>
-                            <div class="anime__review__item__text">
-                                <h6>Lewis Mann - <span>5 Hour ago</span></h6>
-                                <p>Finally it came out ages ago</p>
-                            </div>
-                        </div>
-                        <div class="anime__review__item">
-                            <div class="anime__review__item__pic">
-                                <img src="img/anime/user.jpg" alt="">
-                            </div>
-                            <div class="anime__review__item__text">
-                                <h6>Louis Tyler - <span>20 Hour ago</span></h6>
-                                <p>Where is the episode 15 ? Slow update! Tch</p>
-                            </div>
-                        </div>
-                        <div class="anime__review__item">
-                            <div class="anime__review__item__pic">
-                                <img src="img/anime/user.jpg" alt="">
-                            </div>
-                            <div class="anime__review__item__text">
-                                <h6>Chris Curry - <span>1 Hour ago</span></h6>
-                                <p>whachikan Just noticed that someone categorized this as belonging to the genre
-                                    "demons" LOL</p>
-                            </div>
-                        </div>
-                        <div class="anime__review__item">
-                            <div class="anime__review__item__pic">
-                                <img src="img/anime/user.jpg" alt="">
-                            </div>
-                            <div class="anime__review__item__text">
-                                <h6>Lewis Mann - <span>5 Hour ago</span></h6>
-                                <p>Finally it came out ages ago</p>
-                            </div>
-                        </div>
-                        <div class="anime__review__item">
-                            <div class="anime__review__item__pic">
-                                <img src="img/anime/user.jpg" alt="">
-                            </div>
-                            <div class="anime__review__item__text">
-                                <h6>Louis Tyler - <span>20 Hour ago</span></h6>
-                                <p>Where is the episode 15 ? Slow update! Tch</p>
-                            </div>
+                            {% empty %}
+                            <p>No reviews available for this movie.</p>
+                            {% endfor %}
                         </div>
                     </div>
+                    {% if user.is_authenticated %}
                     <div class="anime__details__form">
                         <div class="section-title">
                             <h5>Your Comment</h5>
                         </div>
-                        <form action="#">
-                            <textarea placeholder="Your Comment"></textarea>
+                        <form action="{% url 'submit_review' %}" method="POST" id="review-form">
+                            {% csrf_token %}
+                            <textarea id="review-text" name="review_text" placeholder="Your Comment"></textarea>
+                            <div class="rating" id="star-rating">
+                                <ul class="rating-stars">
+                                    <li id="star1" value="1" class="star">&#9734;</li>
+                                    <li id="star2" value="2" class="star">&#9734;</li>
+                                    <li id="star3" value="3" class="star">&#9734;</li>
+                                    <li id="star4" value="4" class="star">&#9734;</li>
+                                    <li id="star5" value="5" class="star">&#9734;</li>
+                                </ul>
+                            </div>
+                            <input type="hidden" name="movie_id" value="{{ movie.id }}">
+                            <input type="hidden" name="rating" id="rating-value" value="">
                             <button type="submit"><i class="fa fa-location-arrow"></i> Review</button>
                         </form>
                     </div>
+                    {% endif %}
                 </div>
                 <div class="col-lg-4 col-md-4">
                     <div class="anime__details__sidebar">
@@ -239,10 +228,11 @@
                             <h5>you might like...</h5>
                         </div>
                         {% for movie in related_movies %}
-                        <div class="product__sidebar__view__item set-bg" style="background-image: url('{{ movie.poster_url }}');"
-                        data-setbg="{{ movie.poster_url }}">
+                        <div class="product__sidebar__view__item set-bg"
+                            style="background-image: url('{{ movie.poster_url }}');"
+                            data-setbg="{{ movie.poster_url }}">
                             <div class="ep">{{movie.vote_average}}</div>
-                            
+
                             <h5><a href="{% url 'movie-details' movie.id %}">{{movie.title}}</a></h5>
                         </div>
                         {% endfor %}
@@ -311,7 +301,78 @@
     <script src="{% static 'js/jquery.slicknav.js' %}"></script>
     <script src="{% static 'js/owl.carousel.min.js' %}"></script>
     <script src="{% static 'js/main.js' %}"></script>
+    <script>
+        // JavaScript code to handle the star rating selection
+        const stars = document.querySelectorAll('.rating-stars .star');
+        const ratingValueField = document.getElementById('rating-value');
 
+        stars.forEach(star => {
+            star.addEventListener('click', () => {
+                const rating = parseInt(star.getAttribute('value'));
+                ratingValueField.value = rating.toString();
+
+                // Update the star rating UI
+                stars.forEach(s => {
+                    const starValue = parseInt(s.getAttribute('value'));
+                    if (starValue <= rating) {
+                        s.classList.add('filled');
+                    } else {
+                        s.classList.remove('filled');
+                    }
+                });
+            });
+        });
+    </script>
+    <style>
+        .rating-stars {
+            list-style-type: none;
+            padding: 0;
+            display: inline-block;
+        }
+
+        .star {
+            display: inline-block;
+            font-size: 24px;
+            color: #ccc;
+            cursor: pointer;
+        }
+
+        .star.active,
+        .star:hover {
+            color: gold;
+        }
+
+        .rating-stars .star.filled {
+            color: gold;
+            /* Filled star color */
+        }
+
+        .gold-stars .star {
+            color: gold;
+        }
+
+        .star {
+            color: black;
+            /* Default color for stars */
+        }
+
+        .gold-star {
+            color: gold;
+            /* Color for gold stars */
+        }
+        .avatar-initials {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #4285F4;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 40px;
+}
+    </style>
 </body>
 
 </html>
