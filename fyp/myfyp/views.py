@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
 from django.contrib.auth.models import User, auth
 from django.contrib import messages
-from .api import get_top_rated_movies, get_latest_movies, get_popular_shows, get_trending_movies,get_top_viewed_movies,get_related_movies,get_upcoming_movies
+from .api import get_top_rated_movies, get_latest_movies, get_popular_shows, get_trending_movies,get_top_viewed_movies,get_related_movies,get_upcoming_movies, get_movie_recommendations, calculate_movie_similarities
 import requests
 import datetime
 from .models import Review
@@ -31,11 +31,14 @@ def submit_review(request):
 
 
 def index(request):
+    user_reviews = Review.objects.all().values("movie_id", "user", "rating", "review_text", "created_at")
     top_rated_movies = get_top_rated_movies()
     latest_movies=get_latest_movies()
     popular_shows=get_popular_shows()
     trending_movies=get_trending_movies()
     top_views=get_top_viewed_movies()
+    movie_similarities = calculate_movie_similarities(user_reviews)
+    recommendations = get_movie_recommendations(request.user, user_reviews, movie_similarities, k=3)
     url = 'https://api.themoviedb.org/3/genre/movie/list'
     params = {
         'api_key': '917968e6a5cfe116419446e1aec0d397',  # Replace with your TMDB API key
@@ -45,7 +48,8 @@ def index(request):
     response = requests.get(url, params=params)
     data = response.json()
     categories = data.get('genres', [])
-    return render(request, 'index.html',{'top_rated_movies': top_rated_movies[:3], 'latest_movies': latest_movies[:3],'popular_shows':popular_shows[:3],'trending_movies':trending_movies[:3],'top_views':top_views[:3],'categories': categories})
+
+    return render(request, 'index.html',{'recommendations':recommendations, 'top_rated_movies': top_rated_movies[:3], 'latest_movies': latest_movies[:3],'popular_shows':popular_shows[:3],'trending_movies':trending_movies[:3],'top_views':top_views[:3],'categories': categories})
 
 def category(request, category_name):
     genre_search_url = 'https://api.themoviedb.org/3/genre/movie/list'

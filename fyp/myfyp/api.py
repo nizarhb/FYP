@@ -1,4 +1,59 @@
 import requests
+import numpy as np
+from collections import defaultdict
+from .models import Review
+
+
+
+
+
+def calculate_movie_similarities(user_reviews):
+    movie_ratings = defaultdict(list)
+
+    for review in user_reviews:
+        movie_id = review["movie_id"]
+        rating = review["rating"]
+        movie_ratings[movie_id].append(rating)
+
+    movie_similarities = np.zeros((len(movie_ratings), len(movie_ratings)))
+
+    for i, movie_id1 in enumerate(movie_ratings):
+        for j, movie_id2 in enumerate(movie_ratings):
+            if i == j:
+                movie_similarities[i, j] = 1.0
+            else:
+                ratings1 = np.array(movie_ratings[movie_id1])
+                ratings2 = np.array(movie_ratings[movie_id2])
+                common_indices = np.intersect1d(ratings1.nonzero(), ratings2.nonzero())
+                if len(common_indices) > 0:
+                    movie_similarities[i, j] = np.corrcoef(ratings1[common_indices], ratings2[common_indices])[0, 1]
+
+    return movie_similarities
+
+# Get movie recommendations for a target user
+def get_movie_recommendations(target_user, user_reviews, movie_similarities, k=3):
+    target_user_reviews = [review for review in user_reviews if review["user"] == target_user]
+
+    target_user_ratings = {}
+    for review in target_user_reviews:
+        target_user_ratings[review["movie_id"]] = review["rating"]
+
+    recommendations = []
+
+    for review in user_reviews:
+        if review["user"] != target_user:
+            other_user_rating = target_user_ratings.get(review["movie_id"])
+            if other_user_rating is not None:
+                similarity = movie_similarities[review["movie_id"] - 1, target_user_ratings["movie_id"] - 1]
+                if similarity >= 0.5:  # Adjust the similarity threshold as needed
+                    recommendations.append((review["movie_id"], other_user_rating, similarity))
+
+    recommendations.sort(key=lambda x: x[2], reverse=True)
+    top_recommendations = recommendations[:k]
+
+    return top_recommendations
+
+
 
 
 url = "https://api.themoviedb.org/3/configuration"
