@@ -3,10 +3,6 @@ import numpy as np
 from collections import defaultdict
 from .models import Review
 
-
-
-
-
 def calculate_movie_similarities(user_reviews):
     movie_ratings = defaultdict(list)
 
