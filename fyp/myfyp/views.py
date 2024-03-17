@@ -2,12 +2,93 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
 from django.contrib.auth.models import User, auth
 from django.contrib import messages
-from .api import get_top_rated_movies, get_latest_movies, get_popular_shows, get_trending_movies,get_top_viewed_movies,get_related_movies,get_upcoming_movies, get_movie_recommendations, calculate_movie_similarities
+from .api import search_movies,search_movies_with_cast, get_top_rated_movies, get_latest_movies, get_popular_shows, get_trending_movies,get_top_viewed_movies,get_related_movies,get_upcoming_movies
 import requests
 import datetime
 from .models import Review
+import numpy as np
+from collections import defaultdict
 
+
+def search_view(request):
+    query = request.GET.get('query')
+    movie_results = search_movies(query)
+    cast_results =search_movies_with_cast(query)
+    url = 'https://api.themoviedb.org/3/genre/movie/list'
+    params = {
+        'api_key': '917968e6a5cfe116419446e1aec0d397',  # Replace with your TMDB API key
+        'language': 'en-US',
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+    categories = data.get('genres', [])
+
+    return render(request, 'search_results.html', {'movie_results': movie_results, 'categories': categories, 'cast_results':cast_results})
+def generate_movie_recommendations(user):
+    # Step 1: Retrieve all reviews
+    reviews = Review.objects.all()
+
+    # Step 2: Group reviews by movie ID
+    reviews_by_movie = defaultdict(list)
+    for review in reviews:
+        reviews_by_movie[review.movie_id].append(review)
+
+    # Step 3: Find users with similar ratings
+    similar_ratings = []
+    for movie_reviews in reviews_by_movie.values():
+        for i, review1 in enumerate(movie_reviews):
+            for j in range(i + 1, len(movie_reviews)):
+                review2 = movie_reviews[j]
+
+                # If ratings are similar, add them to the list
+                if review1.rating == review2.rating:
+                    similar_ratings.append((review1, review2))
+
+    # Step 4: Extract unique movie IDs for recommendation
+    recommended_movies = set()
+    for review1, review2 in similar_ratings:
+        recommended_movies.update([review.movie_id for review in review1.user.review_set.all()])
+
+    # Step 5: Remove rated movies by the user
+    rated_movies = [review.movie_id for review in user.review_set.all()]
+    recommended_movies -= set(rated_movies)
+
+    # Step 6: Fetch movie details from the TMDB API
+    recommended_movie_details = fetch_movie_details(recommended_movies)
+
+    return recommended_movie_details
 # Create your views here.
+
+def fetch_movie_details(movie_ids):
+    movie_details = []
+
+    for movie_id in movie_ids:
+        # Make an API request to fetch movie details
+        response = requests.get(f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=917968e6a5cfe116419446e1aec0d397")
+
+        if response.status_code == 200:
+            # Parse the response JSON
+            movie_data = response.json()
+
+            # Extract the relevant movie details
+            movie_title = movie_data['title']
+            movie_genres = [genre['name'] for genre in movie_data['genres']]
+            movie_overview = movie_data['overview']
+            movie_poster_url = f"https://image.tmdb.org/t/p/w500/{movie_data['poster_path']}"
+
+            # Create a dictionary with the movie details
+            movie_detail = {
+                'id': movie_id,
+                'title': movie_title,
+                'genres': movie_genres,
+                'overview': movie_overview,
+                'poster_url': movie_poster_url
+            }
+
+            movie_details.append(movie_detail)
+
+    return movie_details
 def submit_review(request):
     if request.method == 'POST':
         # Retrieve form data
@@ -28,7 +109,12 @@ def submit_review(request):
     # Handle GET requests if needed
     # ...
 
-
+def get_logged_in_user(request):
+    # Assuming you are using Django's built-in authentication system
+    if request.user.is_authenticated:
+        return request.user
+    else:
+        return None
 
 def index(request):
     user_reviews = Review.objects.all().values("movie_id", "user", "rating", "review_text", "created_at")
@@ -37,8 +123,8 @@ def index(request):
     popular_shows=get_popular_shows()
     trending_movies=get_trending_movies()
     top_views=get_top_viewed_movies()
-    movie_similarities = calculate_movie_similarities(user_reviews)
-    recommendations = get_movie_recommendations(request.user, user_reviews, movie_similarities, k=3)
+    
+
     url = 'https://api.themoviedb.org/3/genre/movie/list'
     params = {
         'api_key': '917968e6a5cfe116419446e1aec0d397',  # Replace with your TMDB API key
@@ -48,8 +134,8 @@ def index(request):
     response = requests.get(url, params=params)
     data = response.json()
     categories = data.get('genres', [])
-
-    return render(request, 'index.html',{'recommendations':recommendations, 'top_rated_movies': top_rated_movies[:3], 'latest_movies': latest_movies[:3],'popular_shows':popular_shows[:3],'trending_movies':trending_movies[:3],'top_views':top_views[:3],'categories': categories})
+    recommendation=generate_movie_recommendations(request.user)
+    return render(request, 'index.html',{'recommendation':recommendation, 'top_rated_movies': top_rated_movies[:3], 'latest_movies': latest_movies[:3],'popular_shows':popular_shows[:3],'trending_movies':trending_movies[:3],'top_views':top_views[:3],'categories': categories})
 
 def category(request, category_name):
     genre_search_url = 'https://api.themoviedb.org/3/genre/movie/list'

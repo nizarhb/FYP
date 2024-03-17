@@ -49,6 +49,7 @@
             $('#search-input').val('');
         });
     });
+    
 
     /*------------------
 		Navigation

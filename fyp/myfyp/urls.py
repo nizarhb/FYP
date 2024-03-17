@@ -10,4 +10,5 @@ urlpatterns=[
     path('blog', views.blog, name='blog'), 
     path('submit-review/', views.submit_review, name='submit_review'),
     path('delete-review/<int:review_id>/', views.delete_review, name='delete_review'),
+    path('search_view/', views.search_view, name='search_view'),
 ]
